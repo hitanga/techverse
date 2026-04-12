@@ -2,7 +2,57 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import Cropper from 'react-easy-crop';
 import { db, auth } from '../firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, orderBy, limit, onSnapshot, getDocs } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, orderBy, limit, onSnapshot, getDocs, getDocFromServer } from 'firebase/firestore';
+
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+}
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import ReactQuill from 'react-quill-new';
@@ -155,6 +205,19 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
+    async function testConnection() {
+      try {
+        await getDocFromServer(doc(db, 'test', 'connection'));
+      } catch (error) {
+        if(error instanceof Error && error.message.includes('the client is offline')) {
+          console.error("Please check your Firebase configuration. ");
+        }
+      }
+    }
+    testConnection();
+  }, []);
+
+  useEffect(() => {
     if (showUrlInput) {
       setTempImageUrl(imageUrl);
     }
@@ -173,6 +236,8 @@ export default function Dashboard() {
       const unsubscribeRecent = onSnapshot(qRecent, (snapshot) => {
         const posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setRecentPosts(posts);
+      }, (error) => {
+        handleFirestoreError(error, OperationType.LIST, 'posts');
       });
 
       // Fetch all posts for analytics
@@ -180,12 +245,16 @@ export default function Dashboard() {
       const unsubscribeAll = onSnapshot(qAll, (snapshot) => {
         const posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setAllPosts(posts);
+      }, (error) => {
+        handleFirestoreError(error, OperationType.LIST, 'posts');
       });
 
       // Fetch subscriber count
       const qSubscribers = query(collection(db, 'subscribers'));
       const unsubscribeSubscribers = onSnapshot(qSubscribers, (snapshot) => {
         setSubscriberCount(snapshot.size);
+      }, (error) => {
+        handleFirestoreError(error, OperationType.LIST, 'subscribers');
       });
 
       return () => {
@@ -461,47 +530,55 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                    {recentPosts.map((post) => (
-                      <tr key={post.id} className="group">
-                        <td className="py-6">
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0">
-                              <img src={post.image} alt="" className="w-full h-full object-cover" />
-                            </div>
-                            <div>
-                              <p className="font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">{post.title}</p>
-                              <p className="text-xs text-slate-400">{post.category}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-6">
-                          <span className={`px-3 py-1 rounded-full text-[8px] font-bold uppercase tracking-wider ${
-                            post.status === 'published' ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
-                          }`}>
-                            {post.status}
-                          </span>
-                        </td>
-                        <td className="py-6 text-sm text-slate-500 dark:text-slate-400">
-                          {post.createdAt?.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </td>
-                        <td className="py-6 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button 
-                              onClick={() => handleEdit(post)}
-                              className="p-2 text-slate-400 hover:text-primary transition-colors"
-                            >
-                              <Edit2 size={18} />
-                            </button>
-                            <button 
-                              onClick={() => setPostToDelete(post.id)}
-                              className="p-2 text-slate-400 hover:text-rose-500 transition-colors"
-                            >
-                              <Trash size={18} />
-                            </button>
-                          </div>
+                    {recentPosts.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="py-12 text-center text-slate-500 dark:text-slate-400">
+                          No recent posts found. Create your first post!
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      recentPosts.map((post) => (
+                        <tr key={post.id} className="group">
+                          <td className="py-6">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0">
+                                <img src={post.image} alt="" className="w-full h-full object-cover" />
+                              </div>
+                              <div>
+                                <p className="font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">{post.title}</p>
+                                <p className="text-xs text-slate-400">{post.category}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-6">
+                            <span className={`px-3 py-1 rounded-full text-[8px] font-bold uppercase tracking-wider ${
+                              post.status === 'published' ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                            }`}>
+                              {post.status}
+                            </span>
+                          </td>
+                          <td className="py-6 text-sm text-slate-500 dark:text-slate-400">
+                            {post.createdAt?.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </td>
+                          <td className="py-6 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button 
+                                onClick={() => handleEdit(post)}
+                                className="p-2 text-slate-400 hover:text-primary transition-colors"
+                              >
+                                <Edit2 size={18} />
+                              </button>
+                              <button 
+                                onClick={() => setPostToDelete(post.id)}
+                                className="p-2 text-slate-400 hover:text-rose-500 transition-colors"
+                              >
+                                <Trash size={18} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -721,47 +798,55 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                  {allPosts.map((post) => (
-                    <tr key={post.id} className="group">
-                      <td className="py-6">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0">
-                            <img src={post.image} alt="" className="w-full h-full object-cover" />
-                          </div>
-                          <div>
-                            <p className="font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">{post.title}</p>
-                            <p className="text-xs text-slate-400">{post.category}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-6">
-                        <span className={`px-3 py-1 rounded-full text-[8px] font-bold uppercase tracking-wider ${
-                          post.status === 'published' ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
-                        }`}>
-                          {post.status}
-                        </span>
-                      </td>
-                      <td className="py-6 text-sm text-slate-500 dark:text-slate-400">
-                        {post.createdAt?.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </td>
-                      <td className="py-6 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button 
-                            onClick={() => handleEdit(post)}
-                            className="p-2 text-slate-400 hover:text-primary transition-colors"
-                          >
-                            <Edit2 size={18} />
-                          </button>
-                          <button 
-                            onClick={() => setPostToDelete(post.id)}
-                            className="p-2 text-slate-400 hover:text-rose-500 transition-colors"
-                          >
-                            <Trash size={18} />
-                          </button>
-                        </div>
+                  {allPosts.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="py-12 text-center text-slate-500 dark:text-slate-400">
+                        No posts found.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    allPosts.map((post) => (
+                      <tr key={post.id} className="group">
+                        <td className="py-6">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0">
+                              <img src={post.image} alt="" className="w-full h-full object-cover" />
+                            </div>
+                            <div>
+                              <p className="font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">{post.title}</p>
+                              <p className="text-xs text-slate-400">{post.category}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-6">
+                          <span className={`px-3 py-1 rounded-full text-[8px] font-bold uppercase tracking-wider ${
+                            post.status === 'published' ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                          }`}>
+                            {post.status}
+                          </span>
+                        </td>
+                        <td className="py-6 text-sm text-slate-500 dark:text-slate-400">
+                          {post.createdAt?.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </td>
+                        <td className="py-6 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button 
+                              onClick={() => handleEdit(post)}
+                              className="p-2 text-slate-400 hover:text-primary transition-colors"
+                            >
+                              <Edit2 size={18} />
+                            </button>
+                            <button 
+                              onClick={() => setPostToDelete(post.id)}
+                              className="p-2 text-slate-400 hover:text-rose-500 transition-colors"
+                            >
+                              <Trash size={18} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
