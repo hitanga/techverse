@@ -1,0 +1,62 @@
+{
+  "entities": {
+    "Post": {
+      "title": "Blog Post",
+      "description": "A technical blog post article.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "The title of the post" },
+        "description": { "type": "string", "description": "A short summary of the post" },
+        "content": { "type": "string", "description": "The full markdown content of the post" },
+        "category": { "type": "string", "description": "The category of the post" },
+        "tags": { "type": "array", "items": { "type": "string" }, "description": "List of tags" },
+        "image": { "type": "string", "description": "URL of the featured image" },
+        "authorId": { "type": "string", "description": "UID of the author" },
+        "authorName": { "type": "string", "description": "Name of the author" },
+        "authorAvatar": { "type": "string", "description": "Avatar URL of the author" },
+        "status": { "type": "string", "enum": ["draft", "published"], "description": "Publication status" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp" },
+        "readTime": { "type": "string", "description": "Estimated reading time" }
+      },
+      "required": ["title", "content", "category", "authorId", "status", "createdAt"]
+    },
+    "User": {
+      "title": "User Profile",
+      "description": "User profile information and roles.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"], "description": "User role for RBAC" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Subscriber": {
+      "title": "Newsletter Subscriber",
+      "description": "Email address of a newsletter subscriber.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/posts/{postId}": {
+      "schema": "Post",
+      "description": "Collection of blog posts"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Collection of user profiles"
+    },
+    "/subscribers/{subscriberId}": {
+      "schema": "Subscriber",
+      "description": "Collection of newsletter subscribers"
+    }
+  }
+}
