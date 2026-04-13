@@ -9,9 +9,19 @@ import { signOut } from 'firebase/auth';
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const { user, isAdmin } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/blog?q=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchQuery('');
+      setIsMenuOpen(false);
+    }
+  };
 
   const navLinks = [
     { name: 'Home', path: '/' },
@@ -64,14 +74,16 @@ export default function Navbar() {
               {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
             </button>
             
-            <div className="relative hidden sm:block">
+            <form onSubmit={handleSearch} className="relative hidden sm:block">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input 
                 type="text" 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search Insights..." 
                 className="pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-900 border-none rounded-full text-sm focus:ring-2 focus:ring-primary/20 transition-all w-48 lg:w-64 dark:text-white dark:placeholder:text-slate-500"
               />
-            </div>
+            </form>
 
             {user ? (
               <div className="flex items-center gap-3">
@@ -137,6 +149,16 @@ export default function Navbar() {
             className="md:hidden bg-white dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800 overflow-hidden"
           >
             <div className="px-4 pt-2 pb-6 space-y-4">
+              <form onSubmit={handleSearch} className="relative mb-6">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <input 
+                  type="text" 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search Insights..." 
+                  className="w-full pl-10 pr-4 py-3 bg-slate-100 dark:bg-slate-900 border-none rounded-2xl text-sm focus:ring-2 focus:ring-primary/20 transition-all dark:text-white dark:placeholder:text-slate-500"
+                />
+              </form>
               {navLinks.map((link) => (
                 <NavLink
                   key={link.name}

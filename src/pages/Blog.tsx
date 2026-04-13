@@ -69,8 +69,10 @@ const filters = ['All Posts', 'React & Frontend', 'Architecture', 'DevOps', 'AI'
 export default function Blog() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialFilter = searchParams.get('category') || 'All Posts';
+  const searchQuery = searchParams.get('q') || '';
   const [activeFilter, setActiveFilter] = useState(initialFilter);
   const [posts, setPosts] = useState<any[]>([]);
+  const [filteredPosts, setFilteredPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -128,8 +130,24 @@ export default function Blog() {
     return () => unsubscribe();
   }, [activeFilter]);
 
+  useEffect(() => {
+    if (searchQuery) {
+      const queryLower = searchQuery.toLowerCase();
+      const filtered = posts.filter(post => 
+        post.title.toLowerCase().includes(queryLower) || 
+        post.category.toLowerCase().includes(queryLower) ||
+        (post.description && post.description.toLowerCase().includes(queryLower)) ||
+        stripHtml(post.content).toLowerCase().includes(queryLower)
+      );
+      setFilteredPosts(filtered);
+    } else {
+      setFilteredPosts(posts);
+    }
+  }, [searchQuery, posts]);
+
   const handleFilterChange = (filter: string) => {
     setActiveFilter(filter);
+    searchParams.delete('q'); // Clear search when changing category
     if (filter === 'All Posts') {
       searchParams.delete('category');
     } else {
@@ -155,7 +173,11 @@ export default function Blog() {
           animate={{ opacity: 1, y: 0 }}
           className="text-5xl lg:text-7xl font-extrabold text-slate-900 dark:text-white mb-6"
         >
-          The <span className="text-primary">Editorial</span> Feed.
+          {searchQuery ? (
+            <>Search Results for <span className="text-primary">"{searchQuery}"</span></>
+          ) : (
+            <>The <span className="text-primary">Editorial</span> Feed.</>
+          )}
         </motion.h1>
         <motion.p 
           initial={{ opacity: 0, y: 20 }}
@@ -163,7 +185,10 @@ export default function Blog() {
           transition={{ delay: 0.1 }}
           className="text-slate-500 dark:text-slate-400 text-lg max-w-2xl mx-auto mb-12"
         >
-          Deep dives into modern engineering, architecture, and the culture of building great software.
+          {searchQuery 
+            ? `Found ${filteredPosts.length} articles matching your search.`
+            : "Deep dives into modern engineering, architecture, and the culture of building great software."
+          }
         </motion.p>
 
         {/* Filters */}
@@ -189,46 +214,59 @@ export default function Blog() {
 
       {/* Blog Grid */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        {posts.length === 0 ? (
+        {filteredPosts.length === 0 ? (
           <div className="text-center py-20">
-            <p className="text-slate-400 text-lg">No posts found in this category.</p>
+            <p className="text-slate-400 text-lg">
+              {searchQuery 
+                ? "No posts found matching your search query." 
+                : "No posts found in this category."
+              }
+            </p>
+            {searchQuery && (
+              <button 
+                onClick={() => setSearchParams({})}
+                className="mt-4 text-primary font-bold hover:underline"
+              >
+                Clear search and view all posts
+              </button>
+            )}
           </div>
         ) : (
           <>
             <div className="grid lg:grid-cols-3 gap-16 mb-20">
               {/* Main Featured Post */}
-              {posts[0] && (
+              {filteredPosts[0] && (
                 <motion.div 
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}
                   className="lg:col-span-2 group cursor-pointer"
                 >
-                  <Link to={`/blog/${posts[0].id}`}>
+                  <Link to={`/blog/${filteredPosts[0].id}`}>
                     <div className="relative aspect-[16/9] rounded-3xl overflow-hidden mb-8">
                       <img 
-                        src={posts[0].image} 
-                        alt={posts[0].title} 
+                        src={filteredPosts[0].image} 
+                        alt={filteredPosts[0].title} 
                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                         referrerPolicy="no-referrer"
                       />
                     </div>
                     <div className="flex gap-2 mb-6">
                       <span className="px-3 py-1 rounded bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider">
-                        {posts[0].category}
+                        {filteredPosts[0].category}
                       </span>
                     </div>
                     <h2 className="text-3xl lg:text-4xl font-bold text-slate-900 dark:text-white mb-6 group-hover:text-primary transition-colors">
-                      {posts[0].title}
+                      {filteredPosts[0].title}
                     </h2>
                     <p className="text-slate-500 dark:text-slate-400 text-lg mb-8 leading-relaxed max-w-3xl line-clamp-2">
-                      {posts[0].description || stripHtml(posts[0].content).substring(0, 150) + '...'}
+                      {filteredPosts[0].description || stripHtml(filteredPosts[0].content).substring(0, 150) + '...'}
                     </p>
                     <div className="flex items-center gap-4">
-                      <img src={posts[0].authorAvatar} alt={posts[0].authorName} className="w-10 h-10 rounded-full" />
+                      <img src={filteredPosts[0].authorAvatar} alt={filteredPosts[0].authorName} className="w-10 h-10 rounded-full" />
                       <div>
-                        <p className="text-sm font-bold text-slate-900 dark:text-white">{posts[0].authorName}</p>
-                        <p className="text-xs text-slate-400">{posts[0].date} • {posts[0].readTime}</p>
+                        <p className="text-sm font-bold text-slate-900 dark:text-white">{filteredPosts[0].authorName}</p>
+                        <p className="text-xs text-slate-400">{filteredPosts[0].date} • {filteredPosts[0].readTime}</p>
                       </div>
                     </div>
                   </Link>
@@ -236,32 +274,32 @@ export default function Blog() {
               )}
 
               {/* Side Post */}
-              {posts[1] && (
+              {filteredPosts[1] && (
                 <motion.div 
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
                   className="group cursor-pointer"
                 >
-                  <Link to={`/blog/${posts[1].id}`}>
+                  <Link to={`/blog/${filteredPosts[1].id}`}>
                     <div className="relative aspect-[4/5] rounded-3xl overflow-hidden mb-6">
                       <img 
-                        src={posts[1].image} 
-                        alt={posts[1].title} 
+                        src={filteredPosts[1].image} 
+                        alt={filteredPosts[1].title} 
                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                         referrerPolicy="no-referrer"
                       />
                     </div>
                     <div className="flex gap-2 mb-4">
                       <span className="px-3 py-1 rounded bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase tracking-wider">
-                        {posts[1].category}
+                        {filteredPosts[1].category}
                       </span>
                     </div>
                     <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-4 group-hover:text-primary transition-colors">
-                      {posts[1].title}
+                      {filteredPosts[1].title}
                     </h3>
                     <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed line-clamp-3">
-                      {posts[1].description || stripHtml(posts[1].content).substring(0, 100) + '...'}
+                      {filteredPosts[1].description || stripHtml(filteredPosts[1].content).substring(0, 100) + '...'}
                     </p>
                   </Link>
                 </motion.div>
@@ -270,7 +308,7 @@ export default function Blog() {
 
             {/* Grid for more posts */}
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-12">
-              {posts.slice(2).map((post, idx) => (
+              {filteredPosts.slice(2).map((post, idx) => (
                 <motion.div 
                   key={post.id}
                   initial={{ opacity: 0, y: 20 }}
@@ -306,7 +344,7 @@ export default function Blog() {
         )}
 
         {/* Pagination */}
-        {posts.length > 0 && (
+        {filteredPosts.length > 0 && (
           <div className="mt-24 pt-12 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
             <button className="flex items-center gap-2 text-slate-400 font-bold hover:text-slate-900 dark:hover:text-white transition-colors">
               <ChevronLeft size={20} />
