@@ -74,7 +74,7 @@ SEO-friendly web applications, particularly in e-commerce domains.
           <div className="mb-16">
             <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-4">Technical Prowess</h2>
             <p className="text-slate-500 dark:text-slate-400 max-w-2xl">
-              A specialized stack curated for performance, scalability, and exceptional developer experience.
+              I craft fast, scalable, and visually engaging web experiences using React.js and Next.js. With 15+ years in frontend engineering, I specialize in building component-driven architectures that are clean, efficient, and built for performance. From optimizing Core Web Vitals to delivering SEO-friendly, responsive UIs, I focus on creating products that not only look great but perform flawlessly. I bring strong expertise in modern JavaScript, API integrations, and performance tuning to turn ideas into high-impact digital experiences.
             </p>
           </div>
 
