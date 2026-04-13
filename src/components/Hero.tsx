@@ -6,7 +6,7 @@ export default function Hero() {
   // ... (rest of the code)
 
   return (
-    <section className="relative overflow-hidden pt-16 pb-24 lg:pt-24 lg:pb-32 hero-gradient">
+    <section className="relative overflow-hidden pt-10 pb-24 lg:pt-10 lg:pb-32 hero-gradient">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           <motion.div
