@@ -57,7 +57,7 @@ export default function Hero() {
           >
             <div className="relative z-10 rounded-[2.5rem] overflow-hidden shadow-2xl shadow-slate-200 dark:shadow-none rotate-2 hover:rotate-0 transition-transform duration-700">
               <img 
-                src="https://picsum.photos/seed/tech-setup/800/800" 
+                src="https://ik.imagekit.io/pyq3owdqo/globe-removebg-preview.png" 
                 alt="Tech Setup" 
                 className="w-full h-auto object-cover"
                 referrerPolicy="no-referrer"
