@@ -2,7 +2,7 @@ import { ArrowRight, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { collection, query, where, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { stripHtml } from '../lib/utils';
 
@@ -11,23 +11,32 @@ export default function FeaturedStories() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(
-      collection(db, 'posts'),
-      where('status', '==', 'published'),
-      orderBy('createdAt', 'desc'),
-      limit(3)
-    );
+    const fetchData = async () => {
+      try {
+        const q = query(
+          collection(db, 'posts'),
+          where('status', '==', 'published'),
+          orderBy('createdAt', 'desc'),
+          limit(3)
+        );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetched = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setPosts(fetched);
-      setLoading(false);
-    });
+        const snapshot = await getDocs(q);
+        const fetched = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setPosts(fetched);
+      } catch (error) {
+        console.error("Error fetching featured stories:", error);
+        if (error instanceof Error && (error.message.includes('Quota') || error.message.includes('quota'))) {
+          window.dispatchEvent(new CustomEvent('firestore-quota-exceeded'));
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    return () => unsubscribe();
+    fetchData();
   }, []);
 
   if (loading) return null;

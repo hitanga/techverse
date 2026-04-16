@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import Navbar from './components/Navbar';
 import ScrollToTop from './components/ScrollToTop';
+import QuotaAlert from './components/QuotaAlert';
 import Home from './pages/Home';
 import Blog from './pages/Blog';
 import BlogDetail from './pages/BlogDetail';
@@ -31,6 +32,7 @@ export default function App() {
       <ThemeProvider>
         <Router>
           <ScrollToTop />
+          <QuotaAlert />
           <div className="min-h-screen bg-white dark:bg-slate-950 selection:bg-primary/10 selection:text-primary transition-colors duration-300">
             <Navbar />
             <main>

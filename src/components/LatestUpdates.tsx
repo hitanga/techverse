@@ -2,7 +2,7 @@ import { ArrowRight } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { collection, query, where, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { stripHtml } from '../lib/utils';
 
@@ -11,25 +11,34 @@ export default function LatestUpdates() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch posts starting from the 4th one (since top 3 are in Featured)
-    const q = query(
-      collection(db, 'posts'),
-      where('status', '==', 'published'),
-      orderBy('createdAt', 'desc'),
-      limit(6) // Fetch 6 to show 3 after skipping featured
-    );
+    const fetchData = async () => {
+      try {
+        // Fetch posts starting from the 4th one (since top 3 are in Featured)
+        const q = query(
+          collection(db, 'posts'),
+          where('status', '==', 'published'),
+          orderBy('createdAt', 'desc'),
+          limit(6) // Fetch 6 to show 3 after skipping featured
+        );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetched = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      // Skip the first 3 if they exist (they are in featured)
-      setPosts(fetched.length > 3 ? fetched.slice(3) : fetched);
-      setLoading(false);
-    });
+        const snapshot = await getDocs(q);
+        const fetched = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        // Skip the first 3 if they exist (they are in featured)
+        setPosts(fetched.length > 3 ? fetched.slice(3) : fetched);
+      } catch (error) {
+        console.error("Error fetching latest updates:", error);
+        if (error instanceof Error && (error.message.includes('Quota') || error.message.includes('quota'))) {
+          window.dispatchEvent(new CustomEvent('firestore-quota-exceeded'));
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    return () => unsubscribe();
+    fetchData();
   }, []);
 
   if (loading || posts.length === 0) return null;

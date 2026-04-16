@@ -7,7 +7,7 @@ import {
   query, 
   where, 
   orderBy, 
-  onSnapshot,
+  getDocs,
   getDocFromServer,
   doc
 } from 'firebase/firestore';
@@ -43,8 +43,13 @@ interface FirestoreErrorInfo {
 }
 
 function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  const isQuotaError = errorMessage.includes('Quota limit exceeded') || errorMessage.includes('quota exceeded');
+
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: isQuotaError 
+      ? "Daily Firestore read quota reached. The app will resume working automatically in 24 hours when the free tier resets. You can check your usage in the Firebase Console."
+      : errorMessage,
     authInfo: {
       userId: auth.currentUser?.uid,
       email: auth.currentUser?.email,
@@ -62,6 +67,10 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
     path
   }
   console.error('Firestore Error: ', JSON.stringify(errInfo));
+
+  if (isQuotaError) {
+    window.dispatchEvent(new CustomEvent('firestore-quota-exceeded'));
+  }
 }
 
 const filters = ['All Posts', 'React & Frontend', 'Architecture', 'DevOps', 'AI'];
@@ -99,35 +108,39 @@ export default function Blog() {
   }, [searchParams]);
 
   useEffect(() => {
-    let q = query(
-      collection(db, 'posts'), 
-      where('status', '==', 'published'),
-      orderBy('createdAt', 'desc')
-    );
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        let q = query(
+          collection(db, 'posts'), 
+          where('status', '==', 'published'),
+          orderBy('createdAt', 'desc')
+        );
 
-    if (activeFilter !== 'All Posts') {
-      q = query(
-        collection(db, 'posts'),
-        where('status', '==', 'published'),
-        where('category', '==', activeFilter),
-        orderBy('createdAt', 'desc')
-      );
-    }
+        if (activeFilter !== 'All Posts') {
+          q = query(
+            collection(db, 'posts'),
+            where('status', '==', 'published'),
+            where('category', '==', activeFilter),
+            orderBy('createdAt', 'desc')
+          );
+        }
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedPosts = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        date: doc.data().createdAt?.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-      }));
-      setPosts(fetchedPosts);
-      setLoading(false);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'posts');
-      setLoading(false);
-    });
+        const snapshot = await getDocs(q);
+        const fetchedPosts = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          date: doc.data().createdAt?.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        }));
+        setPosts(fetchedPosts);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.LIST, 'posts');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    return () => unsubscribe();
+    fetchData();
   }, [activeFilter]);
 
   useEffect(() => {

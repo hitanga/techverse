@@ -28,21 +28,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
-        // Check user role in Firestore
-        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-        if (userDoc.exists()) {
-          setRole(userDoc.data().role);
-        } else {
-          // Default role for new users
-          const defaultRole = currentUser.email === 'gopalzone2025@gmail.com' ? 'admin' : 'user';
-          await setDoc(doc(db, 'users', currentUser.uid), {
-            uid: currentUser.uid,
-            email: currentUser.email,
-            displayName: currentUser.displayName,
-            photoURL: currentUser.photoURL,
-            role: defaultRole,
-          });
-          setRole(defaultRole);
+        try {
+          // Check user role in Firestore
+          const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+          if (userDoc.exists()) {
+            setRole(userDoc.data().role);
+          } else {
+            // Default role for new users
+            const defaultRole = currentUser.email === 'gopalzone2025@gmail.com' ? 'admin' : 'user';
+            await setDoc(doc(db, 'users', currentUser.uid), {
+              uid: currentUser.uid,
+              email: currentUser.email,
+              displayName: currentUser.displayName,
+              photoURL: currentUser.photoURL,
+              role: defaultRole,
+            });
+            setRole(defaultRole);
+          }
+        } catch (error) {
+          console.error("Auth Firestore Error:", error);
+          if (error instanceof Error && (error.message.includes('Quota') || error.message.includes('quota'))) {
+            window.dispatchEvent(new CustomEvent('firestore-quota-exceeded'));
+          }
         }
       } else {
         setRole(null);

@@ -146,7 +146,7 @@ export default function Navbar() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-white dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800 overflow-hidden"
+            className="md:hidden bg-[#f4f4f4] dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800 overflow-hidden"
           >
             <div className="px-4 pt-2 pb-6 space-y-4">
               <form onSubmit={handleSearch} className="relative mb-6">

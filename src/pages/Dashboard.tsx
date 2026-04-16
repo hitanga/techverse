@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import Cropper from 'react-easy-crop';
 import { db, auth } from '../firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, orderBy, limit, onSnapshot, getDocs, getDocFromServer } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, orderBy, limit, onSnapshot, getDocs, getDocFromServer, getCountFromServer } from 'firebase/firestore';
 
 enum OperationType {
   CREATE = 'create',
@@ -33,8 +33,13 @@ interface FirestoreErrorInfo {
 }
 
 function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  const isQuotaError = errorMessage.includes('Quota limit exceeded') || errorMessage.includes('quota exceeded');
+  
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: isQuotaError 
+      ? "Daily Firestore read quota reached. The app will resume working automatically in 24 hours when the free tier resets. You can check your usage in the Firebase Console."
+      : errorMessage,
     authInfo: {
       userId: auth.currentUser?.uid,
       email: auth.currentUser?.email,
@@ -52,10 +57,16 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
     path
   }
   console.error('Firestore Error: ', JSON.stringify(errInfo));
+  
+  if (isQuotaError) {
+    // Dispatch custom event for the global alert
+    window.dispatchEvent(new CustomEvent('firestore-quota-exceeded'));
+    console.warn("QUOTA EXCEEDED: Firestore free tier limit reached for today.");
+  }
 }
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import ReactQuill from 'react-quill-new';
+import RichTextEditor from '../components/RichTextEditor';
 import { useTheme } from '../context/ThemeContext';
 import { 
   LineChart, 
@@ -99,33 +110,13 @@ import {
 
 const COLORS = ['#3b36db', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316'];
 
-const quillModules = {
-  toolbar: [
-    [{ 'header': [1, 2, 3, false] }],
-    [{ 'size': ['small', false, 'large', 'huge'] }],
-    ['bold', 'italic', 'underline', 'strike', 'blockquote'],
-    [{ 'color': [] }, { 'background': [] }],
-    [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-    [{ 'align': [] }],
-    ['code-block', 'link'],
-    ['clean']
-  ],
-};
-
-const quillFormats = [
-  'header', 'size',
-  'bold', 'italic', 'underline', 'strike', 'blockquote',
-  'color', 'background',
-  'list', 'align',
-  'code-block', 'link'
-];
-
 export default function Dashboard() {
   const { user, isAdmin, loading } = useAuth();
   const { theme } = useTheme();
   const navigate = useNavigate();
   const [activeView, setActiveView] = useState('dashboard');
   const [title, setTitle] = useState('');
+
   const [category, setCategory] = useState('React & Frontend');
   const [tags, setTags] = useState('');
   const [content, setContent] = useState('');
@@ -231,37 +222,30 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (isAdmin) {
-      // Fetch recent posts for dashboard
-      const qRecent = query(collection(db, 'posts'), orderBy('createdAt', 'desc'), limit(5));
-      const unsubscribeRecent = onSnapshot(qRecent, (snapshot) => {
-        const posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setRecentPosts(posts);
-      }, (error) => {
-        handleFirestoreError(error, OperationType.LIST, 'posts');
-      });
+      const fetchData = async () => {
+        try {
+          // Fetch recent posts for dashboard (One-time fetch)
+          const qRecent = query(collection(db, 'posts'), orderBy('createdAt', 'desc'), limit(5));
+          const recentSnapshot = await getDocs(qRecent);
+          const posts = recentSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setRecentPosts(posts);
 
-      // Fetch all posts for analytics
-      const qAll = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
-      const unsubscribeAll = onSnapshot(qAll, (snapshot) => {
-        const posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setAllPosts(posts);
-      }, (error) => {
-        handleFirestoreError(error, OperationType.LIST, 'posts');
-      });
+          // Fetch all posts for analytics (One-time fetch)
+          const qAll = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
+          const allSnapshot = await getDocs(qAll);
+          const allPostsData = allSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setAllPosts(allPostsData);
 
-      // Fetch subscriber count
-      const qSubscribers = query(collection(db, 'subscribers'));
-      const unsubscribeSubscribers = onSnapshot(qSubscribers, (snapshot) => {
-        setSubscriberCount(snapshot.size);
-      }, (error) => {
-        handleFirestoreError(error, OperationType.LIST, 'subscribers');
-      });
-
-      return () => {
-        unsubscribeRecent();
-        unsubscribeAll();
-        unsubscribeSubscribers();
+          // Fetch subscriber count using efficient getCountFromServer
+          const qSubscribers = query(collection(db, 'subscribers'));
+          const countSnapshot = await getCountFromServer(qSubscribers);
+          setSubscriberCount(countSnapshot.data().count);
+        } catch (error) {
+          handleFirestoreError(error, OperationType.LIST, 'dashboard_init');
+        }
       };
+
+      fetchData();
     }
   }, [isAdmin]);
 
@@ -735,15 +719,11 @@ export default function Dashboard() {
 
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Content Editor</label>
-                <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] overflow-hidden border border-slate-100 dark:border-slate-800 shadow-sm">
-                  <ReactQuill 
-                    theme="snow"
-                    value={content}
-                    onChange={setContent}
-                    modules={quillModules}
-                    formats={quillFormats}
-                    placeholder="Start typing your editorial masterpiece..."
-                    className="h-[400px] mb-12 dark:text-white"
+                <div className="min-h-[600px] relative">
+                  <RichTextEditor
+                    content={content}
+                    onChange={(newContent) => setContent(newContent)}
+                    placeholder="Write your blog post here..."
                   />
                 </div>
               </div>

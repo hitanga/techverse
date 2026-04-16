@@ -2,7 +2,7 @@ import { Twitter, Linkedin, Link as LinkIcon, Share2, ArrowRight, ArrowLeft, Loa
 import { Link, useParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { doc, getDoc, collection, query, where, limit, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, limit, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { stripHtml } from '../lib/utils';
 import ReactMarkdown from 'react-markdown';
@@ -70,17 +70,18 @@ export default function BlogDetail() {
             where('status', '==', 'published'),
             limit(4)
           );
-          const unsubscribe = onSnapshot(q, (snapshot) => {
-            const fetched = snapshot.docs
-              .map(d => ({ id: d.id, ...d.data() }))
-              .filter(d => d.id !== id)
-              .slice(0, 3);
-            setRelatedPosts(fetched);
-          });
-          return () => unsubscribe();
+          const snapshot = await getDocs(q);
+          const fetched = snapshot.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter(d => d.id !== id)
+            .slice(0, 3);
+          setRelatedPosts(fetched);
         }
       } catch (error) {
         console.error('Error fetching post:', error);
+        if (error instanceof Error && (error.message.includes('Quota') || error.message.includes('quota'))) {
+          window.dispatchEvent(new CustomEvent('firestore-quota-exceeded'));
+        }
       } finally {
         setLoading(false);
       }
@@ -107,179 +108,116 @@ export default function BlogDetail() {
   }
 
   return (
-    <div className="bg-white dark:bg-slate-950 min-h-screen transition-colors duration-300">
-      {/* Article Header */}
-      <header className="pt-16 pb-12 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto">
-        <Link to="/blog" className="flex items-center gap-2 text-primary font-bold text-sm mb-10 group w-fit">
-          <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-          Back to blogs
+    <div className="bg-[#f8f9fa] dark:bg-slate-950 min-h-screen transition-colors duration-300">
+      <div className="max-w-7xl mx-auto px-5 pt-20">
+        <Link to="/blog" className="inline-flex items-center gap-2 text-primary font-bold text-sm group hover:text-primary/80 transition-all">
+          <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+          Back to blog
         </Link>
-
-        <div className="flex gap-3 mb-8">
-          <span className="px-3 py-1 rounded bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider">
-            {post.category}
-          </span>
-          <span className="px-3 py-1 rounded bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase tracking-wider">
-            {post.readTime}
-          </span>
-        </div>
         
-        <h1 className="text-4xl lg:text-6xl font-extrabold text-slate-900 dark:text-white mb-10 leading-tight">
-          {post.title}
-        </h1>
-
-        <div className="flex flex-wrap items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <img 
-              src={post.authorAvatar} 
-              alt={post.authorName} 
-              className="w-12 h-12 rounded-xl object-cover"
-            />
-            <div>
-              <p className="font-bold text-slate-900 dark:text-white">{post.authorName}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Lead Architect @ TechVerse • {post.date}</p>
-            </div>
-          </div>
+        {/* Article Header */}
+        <header className="pt-12 pb-12 text-left">
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-4 mb-10"
+          >
+            <span className="inline-block px-3 py-1 rounded-lg bg-[#d4edda] text-[#155724] text-xs font-semibold">
+              {post.category}
+            </span>
+            <p className="text-slate-400 text-sm font-medium">
+              {post.date}
+            </p>
+          </motion.div>
           
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={() => handleShare('twitter')}
-              className="p-2 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-400 hover:text-primary transition-colors"
-              title="Share on Twitter"
-            >
-              <Twitter size={18} />
-            </button>
-            <button 
-              onClick={() => handleShare('linkedin')}
-              className="p-2 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-400 hover:text-primary transition-colors"
-              title="Share on LinkedIn"
-            >
-              <Linkedin size={18} />
-            </button>
-            <button 
-              onClick={() => handleShare()}
-              className="p-2 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-400 hover:text-primary transition-colors"
-              title="Copy Link"
-            >
-              <LinkIcon size={18} />
-            </button>
-          </div>
+          <motion.h1 
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 dark:text-white mb-12 leading-tight tracking-tight"
+          >
+            {post.title}
+          </motion.h1>
+        </header>
+
+        {/* Hero Image */}
+        <div className="mb-20">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-[2.5rem] overflow-hidden shadow-sm shadow-black/5"
+          >
+            <img 
+              src={post.image} 
+              alt={post.title} 
+              className="w-full h-auto object-cover"
+              referrerPolicy="no-referrer"
+            />
+          </motion.div>
         </div>
-      </header>
 
-      {/* Hero Image */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-20">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="rounded-[2.5rem] overflow-hidden aspect-[21/9] shadow-2xl shadow-slate-200 dark:shadow-none"
-        >
-          <img 
-            src={post.image} 
-            alt={post.title} 
-            className="w-full h-full object-cover"
-            referrerPolicy="no-referrer"
-          />
-        </motion.div>
-      </div>
-
-      {/* Content Section */}
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
-        <div className="">
+        {/* Content Section */}
+        <div className="pb-40">
           {/* Main Article Content */}
-          <article className="prose prose-slate dark:prose-invert max-w-none">
+          <article className="blog-content max-w-none">
             <div 
-              className="markdown-body quill-content dark:text-slate-300"
               dangerouslySetInnerHTML={{ __html: post.content }}
             />
+          </article>
 
-            {/* Post Actions */}
-            <div className="flex flex-wrap items-center justify-end pt-12 border-t border-slate-100 dark:border-slate-800 gap-8 mt-16">
-              <div className="flex items-center gap-6">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Share this article</span>
-                <div className="flex gap-4">
+          {/* Share Buttons */}
+          <div className="mt-20 pt-12 border-t border-slate-200 dark:border-slate-800">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
+              <div className="flex items-center gap-4">
+                <span className="text-slate-500 font-bold text-sm uppercase tracking-wider">Share this post</span>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => handleShare('twitter')}
+                    className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-slate-600 dark:text-slate-400 hover:text-primary transition-all shadow-sm hover:shadow-md active:scale-95"
+                  >
+                    <Twitter size={20} />
+                  </button>
+                  <button 
+                    onClick={() => handleShare('linkedin')}
+                    className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-slate-600 dark:text-slate-400 hover:text-primary transition-all shadow-sm hover:shadow-md active:scale-95"
+                  >
+                    <Linkedin size={20} />
+                  </button>
                   <button 
                     onClick={() => handleShare()}
-                    className="text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors flex items-center gap-2"
+                    className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-slate-600 dark:text-slate-400 hover:text-primary transition-all shadow-sm hover:shadow-md active:scale-95 relative"
                   >
-                    <Share2 size={18} />
+                    {showCopied ? <CheckCircle size={20} className="text-emerald-500" /> : <LinkIcon size={20} />}
+                    <AnimatePresence>
+                      {showCopied && (
+                        <motion.span 
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="absolute -top-10 left-1/2 -translate-x-1/2 px-3 py-1 bg-slate-900 text-white text-[10px] font-bold rounded-lg whitespace-nowrap"
+                        >
+                          Copied!
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
                   </button>
                 </div>
               </div>
-            </div>
-          </article>
-        </div>
-      </div>
 
-      {/* Continue Reading Section */}
-      {relatedPosts.length > 0 && (
-        <section className="bg-slate-50 dark:bg-slate-900/50 py-24 transition-colors duration-300">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-end mb-12">
-              <div>
-                <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Continue Reading</h2>
-                <p className="text-slate-500 dark:text-slate-400">Selected deep dives for curious engineers.</p>
-              </div>
-              <Link to="/blog" className="flex items-center gap-2 text-primary font-bold text-sm group">
-                View all posts
-                <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-              </Link>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-8">
-              {relatedPosts.map((p, idx) => (
-                <motion.div 
-                  key={p.id}
-                  whileHover={{ y: -5 }}
-                  className="group cursor-pointer"
-                >
-                  <Link to={`/blog/${p.id}`}>
-                    <div className="aspect-video rounded-2xl overflow-hidden mb-6">
-                      <img 
-                        src={p.image} 
-                        alt={p.title} 
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                        referrerPolicy="no-referrer"
-                      />
-                    </div>
-                    <div className="flex items-center gap-3 mb-4">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-primary">
-                        {p.category}
-                      </span>
-                      <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-700"></span>
-                      <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">
-                        {p.readTime}
-                      </span>
-                    </div>
-                    <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4 group-hover:text-primary transition-colors line-clamp-2">
-                      {p.title}
-                    </h3>
-                    <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed line-clamp-2">
-                      {p.description || stripHtml(p.content).substring(0, 100) + '...'}
-                    </p>
+              {post.category && (
+                <div className="flex items-center gap-3">
+                  <span className="text-slate-400 text-sm font-medium italic">Category:</span>
+                  <Link 
+                    to={`/blog?category=${encodeURIComponent(post.category)}`}
+                    className="px-4 py-2 bg-primary/10 text-primary rounded-xl text-sm font-bold hover:bg-primary hover:text-white transition-all shadow-sm hover:shadow-primary/20"
+                  >
+                    {post.category}
                   </Link>
-                </motion.div>
-              ))}
+                </div>
+              )}
             </div>
           </div>
-        </section>
-      )}
-      {/* Copied Notification */}
-      <AnimatePresence>
-        {showCopied && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50"
-          >
-            <div className="bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3">
-              <CheckCircle size={18} className="text-emerald-400" />
-              <span className="text-sm font-bold">Link copied to clipboard!</span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+        </div>
+      </div>
     </div>
   );
 }
