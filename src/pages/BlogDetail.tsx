@@ -116,7 +116,7 @@ export default function BlogDetail() {
         </Link>
         
         {/* Article Header */}
-        <header className="pt-12 pb-12 text-left">
+        <header className="pt-4 pb-4 text-left">
           <motion.div 
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -133,7 +133,7 @@ export default function BlogDetail() {
           <motion.h1 
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 dark:text-white mb-12 leading-tight tracking-tight"
+            className="text-2xl md:text-6xl lg:text-5xl font-bold text-slate-900 dark:text-white mb-12 leading-tight tracking-tight"
           >
             {post.title}
           </motion.h1>

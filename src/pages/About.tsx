@@ -20,7 +20,9 @@ export default function About() {
               Coding the <span className="text-primary">Future</span> through the lens of a <span className="text-primary">Curator</span>.
             </h1>
             <p className="text-lg text-slate-500 dark:text-slate-400 mb-10 leading-relaxed max-w-xl">
-              I'm Alex Rivera, a senior software engineer and technical educator obsessed with the intersection of clean architecture and human-centric design. At TechVerse, I translate complex systems into elegant, readable narratives.
+              I'm Gopal, Senior Frontend Developer with 15+ years of experience specializing in React.js, Next.js, and
+modern UI engineering. Proven track record of delivering high-performance, scalable, and
+SEO-friendly web applications, particularly in e-commerce domains.
             </p>
             <div className="flex items-center gap-8">
               <motion.button
@@ -44,8 +46,8 @@ export default function About() {
           >
             <div className="aspect-[4/5] rounded-[2.5rem] overflow-hidden shadow-2xl dark:shadow-none">
               <img 
-                src="https://images.unsplash.com/photo-1560250097-0b93528c311a?q=80&w=1974&auto=format&fit=crop" 
-                alt="Alex Rivera" 
+                src="https://ik.imagekit.io/pyq3owdqo/gemini-2.5-flash-image-preview%20(nano-banana)_can_you_please_chang%20(2).png?updatedAt=1776086330040" 
+                alt="Gopal" 
                 className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700"
                 referrerPolicy="no-referrer"
               />
@@ -57,7 +59,7 @@ export default function About() {
               transition={{ delay: 0.5 }}
               className="absolute -bottom-6 -left-6 bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-[240px]"
             >
-              <p className="text-primary font-bold text-xl mb-1">10+ Years</p>
+              <p className="text-primary font-bold text-xl mb-1">15+ Years</p>
               <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                 Building digital ecosystems for global brands.
               </p>
